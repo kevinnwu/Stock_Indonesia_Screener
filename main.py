@@ -6,8 +6,9 @@ from statsmodels.tsa.filters.hp_filter import hpfilter
 
 if 'key' not in st.session_state:
     st.session_state['key'] = '0'
+
 tickers = pd.read_csv('Tickers.csv')['Code']
-df = pd.DataFrame()
+result = pd.DataFrame()
 
 process = st.button('Process')
 
@@ -15,48 +16,44 @@ if process:
     st.session_state['key'] = 1
     loading_text = st.empty()
     progress_bar = st.progress(0)
+    df = pd.DataFrame(columns=['code', 'close-ma30', 'close-ma7', 'close-yest', 'close-today',
+                               'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today'])
     for index, ticker in enumerate(tickers):
         progress_bar.progress(index / len(tickers))
         loading_text.write('Collecting ' + str(ticker))
         tick = yf.download(
             tickers=str(ticker) + '.JK',
-            period="5d",
+            period="30d",
             interval="1d",
             group_by='ticker',
         )
-        tick['YDV'] = tick.diff()['Volume'][1] * -1
-        tick['Code'] = ticker
-        df = df.append(tick.iloc[0], ignore_index=True)
+
+        df['code'] = str(ticker)
+        df['close-ma30'] = tick['Close'].rolling(30).mean()
+        df['close-ma7'] = tick['Close'].rolling(7).mean()
+        df['close-yest'] = tick['Close'][-2]
+        df['close-today'] = tick['Close'][-1]
+        df['vol-ma30'] = tick['Volume'].rolling(30).mean()
+        df['vol-ma7'] = tick['Volume'].rolling(7).mean()
+        df['vol-yest'] = tick['Volume'][-2]
+        df['vol-today'] = tick['Volume'][-1]
+        result = result.append(df.iloc[-1], ignore_index=True)
+    result = result[['code', 'close-ma30', 'close-ma7', 'close-yest', 'close-today',
+                     'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today']]
     progress_bar.empty()
     loading_text.empty()
-
-    df = df.iloc[df['YDV'].abs().argsort()].sort_values(by=['Volume'], ascending=[False])
     dicts = {}
-    for i in df.columns:
-        if i == 'Code':
+    for i in result.columns:
+        if i == 'code':
             continue
         else:
             dicts[i] = lambda x: '{:,.0f}'.format(x)
 
-    s = df.style.format(dicts)
+    s = result.style.format(dicts)
     st.dataframe(s)
-    st.text('YDV : Yesterday Different Volume')
 elif st.session_state['key'] == 1:
     pass
 else:
     st.stop()
 
-tc = st.selectbox('Ticker', tickers)
-tick = yf.download(
-    tickers=str(tc) + '.JK',
-    period="3mo",
-    interval="1d",
-    group_by='ticker',
-)
-test = pd.DataFrame()
-test['Close'] = tick['Close']
 
-cycle, test['Trend'] = hpfilter(tick['Close'], lamb=100)
-
-st.line_chart(test)
-st.line_chart(cycle)
