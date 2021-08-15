@@ -4,6 +4,17 @@ import streamlit as st
 import yfinance as yf
 from statsmodels.tsa.filters.hp_filter import hpfilter
 
+
+def look_diff(stock):
+    diff = stock['close-today'] - stock['close-yest']
+    if diff > 0:
+        return [''] * 9 + ['background-color: lightgreen'] * 1
+    elif diff < 0:
+        return [''] * 9 + ['background-color: pink'] * 1
+    else:
+        return [''] * 9 + ['background-color: yellow'] * 1
+
+
 if 'key' not in st.session_state:
     st.session_state['key'] = '0'
 
@@ -17,7 +28,7 @@ if process:
     loading_text = st.empty()
     progress_bar = st.progress(0)
     df = pd.DataFrame(columns=['code', 'close-ma30', 'close-ma7', 'close-yest', 'close-today',
-                               'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today'])
+                               'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today', 'look'])
     for index, ticker in enumerate(tickers):
         progress_bar.progress(index / len(tickers))
         loading_text.write('Collecting ' + str(ticker))
@@ -37,9 +48,10 @@ if process:
         df['vol-ma7'] = tick['Volume'].rolling(7).mean()
         df['vol-yest'] = tick['Volume'][-2]
         df['vol-today'] = tick['Volume'][-1]
+        df['look'] = df['vol-today'] / df['vol-ma7']
         result = result.append(df.iloc[-1], ignore_index=True)
     result = result[['code', 'close-ma30', 'close-ma7', 'close-yest', 'close-today',
-                     'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today']]
+                     'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today', 'look']]
     progress_bar.empty()
     loading_text.empty()
     dicts = {}
@@ -49,7 +61,12 @@ if process:
         else:
             dicts[i] = lambda x: '{:,.0f}'.format(x)
 
-    s = result.style.format(dicts)
+    s = result.style.format(dicts)\
+        .apply(look_diff, axis=1)
+    """result.style.set_table_styles({'selector': 'tr:hover',
+                                   'props': [('background-color', 'lightblue')]}
+                                  ).hide_index()"""
+
     st.dataframe(s)
 elif st.session_state['key'] == 1:
     pass
