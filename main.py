@@ -52,7 +52,7 @@ tick = yf.download(
     period="3mo",
     interval="1d",
     group_by='ticker',
-)   
+)
 test = pd.DataFrame()
 test['Close'] = tick['Close']
 
