@@ -2,11 +2,12 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import yfinance as yf
+import time
 from statsmodels.tsa.filters.hp_filter import hpfilter
 
 
 def look_diff(stock):
-    diff = stock['close-today'] - stock['close-yest']
+    diff = stock['close-ma7'] - stock['close-ma30']
     if diff > 0:
         return [''] * 9 + ['background-color: lightgreen'] * 1
     elif diff < 0:
@@ -28,14 +29,15 @@ if process:
     loading_text = st.empty()
     progress_bar = st.progress(0)
     df = pd.DataFrame(columns=['code', 'close-ma30', 'close-ma7', 'close-yest', 'close-today',
-                               'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today', 'look'])
+                               'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today', 'look(%)'])
     for index, ticker in enumerate(tickers):
         progress_bar.progress(index / len(tickers))
         loading_text.write('Collecting ' + str(ticker))
         tick = yf.download(
-            tickers=str(ticker) + '.JK',
-            period="30d",
-            interval="1d",
+            # tickers=str(ticker) + '.JK',
+            tickers=str(ticker) + '-USD',
+            period="5d",
+            interval="1h",
             group_by='ticker',
         )
         try:
@@ -48,13 +50,12 @@ if process:
             df['vol-ma7'] = tick['Volume'].rolling(7).mean()
             df['vol-yest'] = tick['Volume'][-2]
             df['vol-today'] = tick['Volume'][-1]
-            df['look'] = df['vol-today'] / df['vol-ma7']
-            result = result.append(df.iloc[-1], ignore_index=True)
-
+            df['look(%)'] = abs((df['close-ma30'] - df['close-ma7']) / df['close-ma30'] * 100)
+            result = result.append(df.iloc[-2], ignore_index=True)
         except:
             continue
     result = result[['code', 'close-ma30', 'close-ma7', 'close-yest', 'close-today',
-                     'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today', 'look']]
+                     'vol-ma30', 'vol-ma7', 'vol-yest', 'vol-today', 'look(%)']]
     progress_bar.empty()
     loading_text.empty()
     dicts = {}
@@ -62,7 +63,7 @@ if process:
         if i == 'code':
             continue
         else:
-            dicts[i] = lambda x: '{:,.0f}'.format(x)
+            dicts[i] = lambda x: '{:,.4f}'.format(x)
 
     s = result.style.format(dicts) \
         .apply(look_diff, axis=1)
